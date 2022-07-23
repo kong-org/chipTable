@@ -1,5 +1,9 @@
 require('dotenv').config()
 const { PRIVATE_KEY, COINMARKETCAP_KEY, ALCHEMY_API_KEY } = process.env || null;
+require("@nomiclabs/hardhat-waffle");
+require('hardhat-contract-sizer');
+require("solidity-docgen");
+require("hardhat-gas-reporter");
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
