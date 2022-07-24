@@ -2,12 +2,10 @@
 
 ## IChipTable
 
-Interface for ChipTable
-
 ### TSMRegistered
 
 ```solidity
-event TSMRegistered(address tsmAddress, bytes32 tsmId, string tsmName, string tsmUri)
+event TSMRegistered(address tsmAddress, string tsmUri)
 ```
 
 Registered TSM
@@ -15,7 +13,7 @@ Registered TSM
 ### TSMApproved
 
 ```solidity
-event TSMApproved(bytes32 tsmId, address operator)
+event TSMApproved(address tsmAddress, address operator)
 ```
 
 TSM approved operator
@@ -23,15 +21,23 @@ TSM approved operator
 ### ChipRegistered
 
 ```solidity
-event ChipRegistered(bytes32 chipId, bytes32 tsmId)
+event ChipRegistered(bytes32 chipId, address tsmAddress)
 ```
 
 Chip Registered with ERS
 
+### signatureMessage
+
+```solidity
+function signatureMessage() external pure returns (string)
+```
+
+returns the message to be signed by the chip
+
 ### registerTSM
 
 ```solidity
-function registerTSM(address tsmAddress, string tsmName, string tsmUri) external
+function registerTSM(address tsmAddress, string uri) external
 ```
 
 Registers a TSM 
@@ -40,10 +46,19 @@ Permissions: Owner
 ### registerChipIds
 
 ```solidity
-function registerChipIds(bytes32 tsmId, bytes32[] chipIds) external
+function registerChipIds(address tsmAddress, bytes32[] chipIds) external
 ```
 
 Registers Chip Ids without signatures
+Permissions: Owner
+
+### safeRegisterChipIds
+
+```solidity
+function safeRegisterChipIds(address tsmAddress, bytes32[] chipIds, bytes[] signatures) external
+```
+
+Registers Chip Ids with Signatures
 Permissions: Owner
 
 ### totalTSMs
@@ -54,42 +69,26 @@ function totalTSMs() external view returns (uint256)
 
 Returns the number of registered TSMs
 
-### tsmIdByIndex
+### tsmByIndex
 
 ```solidity
-function tsmIdByIndex(uint256 index) external view returns (bytes32)
+function tsmByIndex(uint256 index) external view returns (address)
 ```
 
 Returns the TSM Id by Index
 
-### tsmName
-
-```solidity
-function tsmName(bytes32 tsmId) external view returns (string)
-```
-
-Returns the TSM name
-
 ### tsmUri
 
 ```solidity
-function tsmUri(bytes32 tsmId) external view returns (string)
+function tsmUri(address tsmAddress) external view returns (string)
 ```
 
 Returns the TSM uri
 
-### tsmAddress
-
-```solidity
-function tsmAddress(bytes32 tsmId) external view returns (address)
-```
-
-Returns the TSM address
-
 ### tsmOperator
 
 ```solidity
-function tsmOperator(bytes32 tsmId) external view returns (address)
+function tsmOperator(address tsmAddress) external view returns (address)
 ```
 
 Returns the TSM operator
@@ -97,7 +96,7 @@ Returns the TSM operator
 ### approve
 
 ```solidity
-function approve(bytes32 tsmId, address operator) external
+function approve(address operator) external
 ```
 
 Approves an operator for a TSM
@@ -105,7 +104,7 @@ Approves an operator for a TSM
 ### addChipId
 
 ```solidity
-function addChipId(bytes32 tsmId, bytes32 chipId, bytes signature) external
+function addChipId(address tsmAddress, bytes32 chipId, bytes signature) external
 ```
 
 Adds a ChipId
@@ -115,17 +114,17 @@ Permissions: TSM
 ### addChipIds
 
 ```solidity
-function addChipIds(bytes32 tsmId, bytes32[] chipIds, bytes[] signatures) external
+function addChipIds(address tsmAddress, bytes32[] chipIds, bytes[] signatures) external
 ```
 
 Adds ChipIds
 requires a signature
 Permissions: TSM
 
-### chipTSMId
+### chipTSM
 
 ```solidity
-function chipTSMId(bytes32 chipId) external view returns (bytes32)
+function chipTSM(bytes32 chipId) external view returns (address)
 ```
 
 gets a Chip's TSM Id
@@ -144,9 +143,8 @@ Gets the Chip Redirect Uri
 
 ```solidity
 struct TSM {
-  address _address;
+  bool _isRegistered;
   address _operator;
-  string _name;
   string _uri;
 }
 ```
@@ -155,14 +153,14 @@ struct TSM {
 
 ```solidity
 struct ChipInfo {
-  bytes32 _tsmId;
+  address _tsmAddress;
 }
 ```
 
 ### _tsms
 
 ```solidity
-mapping(bytes32 => struct ChipTable.TSM) _tsms
+mapping(address => struct ChipTable.TSM) _tsms
 ```
 
 ### _chipIds
@@ -174,7 +172,7 @@ mapping(bytes32 => struct ChipTable.ChipInfo) _chipIds
 ### _tsmIndex
 
 ```solidity
-mapping(uint256 => bytes32) _tsmIndex
+mapping(uint256 => address) _tsmIndex
 ```
 
 ### _tsmCount
@@ -201,52 +199,88 @@ bytes32 SIGNATURE_HASH
 constructor(address _contractOwner) public
 ```
 
+### supportsInterface
+
+```solidity
+function supportsInterface(bytes4 interfaceId) external pure returns (bool)
+```
+
+_Returns true if this contract implements the interface defined by
+`interfaceId`. See the corresponding
+https://eips.ethereum.org/EIPS/eip-165#how-interfaces-are-identified[EIP section]
+to learn more about how these ids are created.
+
+This function call must use less than 30 000 gas._
+
+### signatureMessage
+
+```solidity
+function signatureMessage() external pure returns (string)
+```
+
+returns the message to be signed by the chip
+
 ### registerTSM
 
 ```solidity
-function registerTSM(address _address, string _name, string _uri) external
+function registerTSM(address tsmAddress, string uri) external
 ```
+
+Registers a TSM 
+Permissions: Owner
 
 ### registerChipIds
 
 ```solidity
-function registerChipIds(bytes32 _tsmId, bytes32[] __chipIds) external
+function registerChipIds(address tsmAddress, bytes32[] chipIds) external
 ```
+
+Registers Chip Ids without signatures
+Permissions: Owner
+
+### safeRegisterChipIds
+
+```solidity
+function safeRegisterChipIds(address tsmAddress, bytes32[] chipIds, bytes[] signatures) external
+```
+
+Registers Chip Ids with Signatures
+Permissions: Owner
 
 ### onlyTSM
 
 ```solidity
-modifier onlyTSM(bytes32 _tsmId)
-```
-
-### onlyTSMOrApproved
-
-```solidity
-modifier onlyTSMOrApproved(bytes32 _tsmId)
-```
-
-### _registerTSM
-
-```solidity
-function _registerTSM(bytes32 _tsmId, address _address, string _name, string _uri) internal
-```
-
-### _tsmExists
-
-```solidity
-function _tsmExists(bytes32 _tsmId) internal view returns (bool)
+modifier onlyTSM(address tsmAddress)
 ```
 
 ### _checkTSM
 
 ```solidity
-function _checkTSM(bytes32 _tsmId) internal view
+function _checkTSM(address tsmAddress) internal view
+```
+
+### onlyTSMOrApproved
+
+```solidity
+modifier onlyTSMOrApproved(address tsmAddress)
 ```
 
 ### _checkTSMOrApproved
 
 ```solidity
-function _checkTSMOrApproved(bytes32 _tsmId) internal view
+function _checkTSMOrApproved(address tsmAddress) internal view
+```
+
+### _registerTSM
+
+```solidity
+function _registerTSM(address tsmAddress, string uri) internal
+```
+
+### _tsmExists
+
+```solidity
+function _tsmExists(address tsmAddress) internal view returns (bool)
 ```
 
 ### totalTSMs
@@ -257,87 +291,95 @@ function totalTSMs() external view returns (uint256)
 
 Returns the number of registered TSMs
 
-### tsmIdByIndex
+### tsmByIndex
 
 ```solidity
-function tsmIdByIndex(uint256 _index) external view returns (bytes32)
+function tsmByIndex(uint256 index) external view returns (address)
 ```
 
-### tsmName
-
-```solidity
-function tsmName(bytes32 _tsmId) external view returns (string)
-```
+Returns the TSM Id by Index
 
 ### tsmUri
 
 ```solidity
-function tsmUri(bytes32 _tsmId) public view returns (string)
+function tsmUri(address tsmAddress) public view returns (string)
 ```
 
-### tsmAddress
-
-```solidity
-function tsmAddress(bytes32 _tsmId) public view returns (address)
-```
+Returns the TSM uri
 
 ### tsmOperator
 
 ```solidity
-function tsmOperator(bytes32 _tsmId) public view returns (address)
+function tsmOperator(address tsmAddress) public view returns (address)
 ```
+
+Returns the TSM operator
 
 ### approve
 
 ```solidity
-function approve(bytes32 _tsmId, address _operator) external
+function approve(address operator) external
 ```
+
+Approves an operator for a TSM
 
 ### addChipId
 
 ```solidity
-function addChipId(bytes32 _tsmId, bytes32 _chipId, bytes _signature) external
+function addChipId(address tsmAddress, bytes32 chipId, bytes signature) external
 ```
+
+Adds a ChipId
+requires a signature
+Permissions: TSM
 
 ### addChipIds
 
 ```solidity
-function addChipIds(bytes32 _tsmId, bytes32[] __chipIds, bytes[] _signatures) external
+function addChipIds(address tsmAddress, bytes32[] chipIds, bytes[] signatures) external
 ```
+
+Adds ChipIds
+requires a signature
+Permissions: TSM
 
 ### _chipExists
 
 ```solidity
-function _chipExists(bytes32 _chipId) internal view returns (bool)
+function _chipExists(bytes32 chipId) internal view returns (bool)
 ```
 
 ### _isValidChipSignature
 
 ```solidity
-function _isValidChipSignature(bytes32 _chipId, bytes _signature) internal view returns (bool)
+function _isValidChipSignature(bytes32 chipId, bytes signature) internal view returns (bool)
 ```
 
 ### _addChipSafe
 
 ```solidity
-function _addChipSafe(bytes32 _tsmId, bytes32 _chipId, bytes _signature) internal
+function _addChipSafe(address tsmAddress, bytes32 chipId, bytes signature) internal
 ```
 
 ### _addChip
 
 ```solidity
-function _addChip(bytes32 _tsmId, bytes32 _chipId) internal
+function _addChip(address tsmAddress, bytes32 chipId) internal
 ```
 
-### chipTSMId
+### chipTSM
 
 ```solidity
-function chipTSMId(bytes32 _chipId) public view returns (bytes32)
+function chipTSM(bytes32 chipId) public view returns (address)
 ```
+
+gets a Chip's TSM Id
 
 ### chipUri
 
 ```solidity
-function chipUri(bytes32 _chipId) external view returns (string)
+function chipUri(bytes32 chipId) external view returns (string)
 ```
+
+Gets the Chip Redirect Uri
 
