@@ -1,3 +1,13 @@
+/***
+ * SPDX-License-Identifier: GPL-3.0
+ * == Developer History (NAME, ORG, DATE, DESCR) ==
+ * Isaac Dubuque, Verilink, 7/24/22, Initial Commit
+ * ================================================
+ * 
+ * File: ChipTable.sol
+ * Description: Chip Table Implementation
+ */
+
 pragma solidity ^0.8.5;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -5,24 +15,30 @@ import "@openzeppelin/contracts/utils/Context.sol";
 
 import "../intf/IChipTable.sol";
 
+/***
+ * ChipTable
+ * Provides the implementation for the ERS interim on-chain chip resolution
+ * The Chip Table allows the owner to register Trusted Service Managers (TSM)
+ * TSMs can add chips allowing for a decentralized chip resolution
+ * Chips can be look up their TSM for device information and redirect resolution
+ */
 contract ChipTable is IChipTable, Context, Ownable
 {
   struct TSM 
   {
-    address _address;
+    bool _isRegistered;
     address _operator;
-    string _name;
     string _uri;
   }
 
   struct ChipInfo
   {
-    bytes32 _tsmId;
+    address _tsmAddress;
   }
 
-  mapping(bytes32 => TSM) private _tsms; /* mapping tsmId => tsm */
-  mapping(bytes32 => ChipInfo) private _chipIds; /* mapping from chipId => tsmId */
-  mapping(uint256 => bytes32) private _tsmIndex; /* mapping from TSM index => tsmId */
+  mapping(address => TSM) private _tsms; /* mapping tsmAddress => TSM */
+  mapping(bytes32 => ChipInfo) private _chipIds; /* mapping from chipId => ChipInfo */
+  mapping(uint256 => address) private _tsmIndex; /* mapping from TSM index => tsmAddress */
   uint256 private _tsmCount;
 
   /* constants */
@@ -32,6 +48,7 @@ contract ChipTable is IChipTable, Context, Ownable
   constructor(address _contractOwner)
   {
     transferOwnership(_contractOwner);
+    _tsmCount = 0;
     SIGNATURE_HASH = keccak256(
       abi.encodePacked(
         "\x19Ethereum Signed Message:\n32",
@@ -40,144 +57,160 @@ contract ChipTable is IChipTable, Context, Ownable
     );
   }
 
+  function supportsInterface(bytes4 interfaceId)
+    external pure override returns (bool)
+  {
+    return interfaceId == type(IChipTable).interfaceId;
+  }
+
+  function signatureMessage () external pure override returns (string memory)
+  {
+    return SIGNATURE_MESSAGE;
+  }
+
   /*=== OWNER ===*/
   function registerTSM(
-    address _address, 
-    string calldata _name,
-    string calldata _uri) external override onlyOwner 
+    address tsmAddress, 
+    string calldata uri) external override onlyOwner 
   {
-    bytes32 _tsmId = keccak256(abi.encodePacked(_name));
-    
-    _registerTSM(_tsmId, _address, _name, _uri);
+    _registerTSM(tsmAddress, uri);
 
     /* update indexing */
-    _tsmIndex[_tsmCount] = _tsmId;
+    _tsmIndex[_tsmCount] = tsmAddress;
     _tsmCount = _tsmCount + 1;
   }
 
   function registerChipIds(
-    bytes32 _tsmId,
-    bytes32[] calldata __chipIds
+    address tsmAddress,
+    bytes32[] calldata chipIds
   ) external override onlyOwner
   { 
-    for(uint256 i = 0; i < __chipIds.length; i++)
+    require(_tsmExists(tsmAddress), "Owner: TSM does not exist");
+    for(uint256 i = 0; i < chipIds.length; i++)
     {
-      _addChip(_tsmId, __chipIds[i]);
+      _addChip(tsmAddress, chipIds[i]);
     }
   }
+
+  function safeRegisterChipIds(
+    address tsmAddress,
+    bytes32[] calldata chipIds,
+    bytes[] calldata signatures
+  ) external override onlyOwner
+  { 
+    require(_tsmExists(tsmAddress), "Owner: TSM does not exist");
+    require(chipIds.length == signatures.length, "Owner: chipIds and signatures length mismatch");
+    for(uint256 i = 0; i < chipIds.length; i++)
+    {
+      _addChipSafe(tsmAddress, chipIds[i], signatures[i]);
+    }
+  }
+
+
   /*=== END OWNER ===*/
 
   /*=== TSM ===*/
-  modifier onlyTSM(bytes32 _tsmId) 
+  modifier onlyTSM(address tsmAddress) 
   {
-    _checkTSM(_tsmId);
+    _checkTSM(tsmAddress);
     _;
   }
 
-  modifier onlyTSMOrApproved(bytes32 _tsmId)
+  function _checkTSM(address tsmAddress) internal view
   {
-    _checkTSMOrApproved(_tsmId);
+    require(_tsmExists(tsmAddress), "TSM: tsm does not exist");
+  }
+
+  modifier onlyTSMOrApproved(address tsmAddress)
+  {
+    _checkTSMOrApproved(tsmAddress);
     _;
+  }
+
+  function _checkTSMOrApproved(address tsmAddress) internal view
+  {
+    require(_tsmExists(tsmAddress) && (
+      (_msgSender() == tsmOperator(tsmAddress)) ||
+      (_msgSender() == tsmAddress)),
+      "TSM: caller is not TSM or approved");
   }
 
   function _registerTSM(
-    bytes32 _tsmId,
-    address _address, 
-    string calldata _name,
-    string calldata _uri) internal
+    address tsmAddress, 
+    string calldata uri) internal
   {
-    require(!_tsmExists(_tsmId), "Owner: TSM already registered");
-    _tsms[_tsmId]._address = _address;
-    _tsms[_tsmId]._operator = address(0);
-    _tsms[_tsmId]._name = _name;
-    emit TSMRegistered(_address, _tsmId, _name, _uri);
+    require(!_tsmExists(tsmAddress), "Owner: TSM already registered");
+    _tsms[tsmAddress]._isRegistered = true;
+    _tsms[tsmAddress]._operator = address(0);
+    _tsms[tsmAddress]._uri = uri;
+    emit TSMRegistered(tsmAddress, uri);
   }
 
-  function _tsmExists(bytes32 _tsmId) internal view returns (bool)
+  function _tsmExists(address tsmAddress) internal view returns (bool)
   {
-    return _tsms[_tsmId]._address != address(0);
+    return _tsms[tsmAddress]._isRegistered != false;
   }
 
-  function _checkTSM(bytes32 _tsmId) internal view
-  {
-    require(_msgSender() == tsmAddress(_tsmId), "TSM: caller is not TSM");
-  }
-  
-  function _checkTSMOrApproved(bytes32 _tsmId) internal view
-  {
-    require(_msgSender() == tsmAddress(_tsmId) || _msgSender() == tsmOperator(_tsmId),
-      "TSM: caller is not TSM or approved");
-  }
 
   function totalTSMs() external override view returns (uint256)
   {
     return _tsmCount;
   }
 
-  function tsmIdByIndex(uint256 _index) external override view returns (bytes32)
+  function tsmByIndex(uint256 index) external override view returns (address)
   {
-    require(_index < _tsmCount, "TSM: index out of bounds");
-    return _tsmIndex[_index];
+    require(index < _tsmCount, "TSM: index out of bounds");
+    return _tsmIndex[index];
   }
 
-  function tsmName(bytes32 _tsmId) external override view returns (string memory)
+  function tsmUri(address tsmAddress) 
+    public override view onlyTSM(tsmAddress) returns (string memory) 
   {
-    require(_tsmExists(_tsmId), "TSM: tsm does not exist");
-    return _tsms[_tsmId]._name;
-  }
-
-  function tsmUri(bytes32 _tsmId) public override view returns (string memory)
-  {
-    require(_tsmExists(_tsmId), "TSM: tsm does not exist");
-    return _tsms[_tsmId]._uri;
-  }
-
-  function tsmAddress(bytes32 _tsmId) public override view returns (address)
-  {
-    require(_tsmExists(_tsmId), "TSM: tsm does not exist");
-    return _tsms[_tsmId]._address;
+    return _tsms[tsmAddress]._uri;
   }
   
-  function tsmOperator(bytes32 _tsmId) public override view returns (address)
+  function tsmOperator(address tsmAddress) 
+    public override view onlyTSM(tsmAddress) returns (address)
   {
-    require(_tsmExists(_tsmId), "TSM: tsm does not exist");
-    return _tsms[_tsmId]._operator;
+    return _tsms[tsmAddress]._operator;
   }
 
-  function approve(bytes32 _tsmId, address _operator) external override onlyTSM(_tsmId)
+  function approve(address operator) external override onlyTSM(_msgSender())
   {
-    _tsms[_tsmId]._operator = _operator;
-    emit TSMApproved(_tsmId, _operator);
+    _tsms[_msgSender()]._operator = operator;
+    emit TSMApproved(_msgSender(), operator);
   }
 
   function addChipId(
-    bytes32 _tsmId, 
-    bytes32 _chipId, 
-    bytes calldata _signature) external override onlyTSMOrApproved(_tsmId)
+    address tsmAddress, 
+    bytes32 chipId, 
+    bytes calldata signature) external override onlyTSMOrApproved(tsmAddress)
   {
-    _addChipSafe(_tsmId, _chipId, _signature);
+    _addChipSafe(tsmAddress, chipId, signature);
   }
 
   function addChipIds(
-    bytes32 _tsmId,
-    bytes32[] calldata __chipIds,
-    bytes[] calldata _signatures
-  ) external override onlyTSMOrApproved(_tsmId)
+    address tsmAddress,
+    bytes32[] calldata chipIds,
+    bytes[] calldata signatures
+  ) external override onlyTSMOrApproved(tsmAddress)
   { 
-    for(uint256 i = 0; i < __chipIds.length; i++)
+    require(chipIds.length == signatures.length, "TSM: chipIds and signatures length mismatch");
+    for(uint256 i = 0; i < chipIds.length; i++)
     {
-      _addChipSafe(_tsmId, __chipIds[i], _signatures[i]);
+      _addChipSafe(tsmAddress, chipIds[i], signatures[i]);
     }
   }
+
   /*=== END TSM ===*/
 
   /*=== CHIP ===*/
-  function _chipExists(bytes32 _chipId) internal view returns (bool)
+  function _chipExists(bytes32 chipId) internal view returns (bool)
   {
-    return _chipIds[_chipId]._tsmId != bytes32(0);
+    return _chipIds[chipId]._tsmAddress != address(0);
   }
 
-  function _isValidChipSignature(bytes32 _chipId, bytes calldata _signature) internal view returns (bool)
+  function _isValidChipSignature(bytes32 chipId, bytes calldata signature) internal view returns (bool)
   {
     address _signer;
     bytes32 _r;
@@ -185,12 +218,12 @@ contract ChipTable is IChipTable, Context, Ownable
     uint8 _v;
 
     /* Implementation for Kong Halo Chip 2021 Edition */
-    require(_signature.length == 65, "Chip: invalid sig length");
+    require(signature.length == 65, "Chip: invalid sig length");
 
       /* unpack v, s, r */
-    _r = bytes32(_signature[0:32]);
-    _s = bytes32(_signature[32:64]);
-    _v = uint8(_signature[64]);
+    _r = bytes32(signature[0:32]);
+    _s = bytes32(signature[32:64]);
+    _v = uint8(signature[64]);
 
     if(uint256(_s) > 
       0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0)
@@ -207,31 +240,31 @@ contract ChipTable is IChipTable, Context, Ownable
     
     require(_signer != address(0x0), "Chip: invalid signer");
 
-    return _signer == address(uint160(uint256(_chipId)));
+    return _signer == address(uint160(uint256(chipId)));
   }
 
-  function _addChipSafe(bytes32 _tsmId, bytes32 _chipId, bytes calldata _signature) internal
+  function _addChipSafe(address tsmAddress, bytes32 chipId, bytes calldata signature) internal
   {
-    require(_isValidChipSignature(_chipId, _signature), "Chip: chip signature invalid");
-    _addChip(_tsmId, _chipId);
+    require(_isValidChipSignature(chipId, signature), "Chip: chip signature invalid");
+    _addChip(tsmAddress, chipId);
   }
 
-  function _addChip(bytes32 _tsmId, bytes32 _chipId) internal
+  function _addChip(address tsmAddress, bytes32 chipId) internal
   {
-    require(!_chipExists(_chipId), "Chip: chip already exists");
-    _chipIds[_chipId]._tsmId = _tsmId;
-    emit ChipRegistered(_chipId, _tsmId);
+    require(!_chipExists(chipId), "Chip: chip already exists");
+    _chipIds[chipId]._tsmAddress = tsmAddress;
+    emit ChipRegistered(chipId, tsmAddress);
   }
 
-  function chipTSMId(bytes32 _chipId) public override view returns (bytes32)
+  function chipTSM(bytes32 chipId) public override view returns (address)
   {
-    require(_chipExists(_chipId), "Chip: chip doesn't exist");
-    return _chipIds[_chipId]._tsmId;
+    require(_chipExists(chipId), "Chip: chip doesn't exist");
+    return _chipIds[chipId]._tsmAddress;
   }
   
-  function chipUri(bytes32 _chipId) external override view returns (string memory)
+  function chipUri(bytes32 chipId) external override view returns (string memory)
   {
-    return tsmUri(chipTSMId(_chipId));
+    return tsmUri(chipTSM(chipId));
   }
   /*=== END CHIP ===*/
 }

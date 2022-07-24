@@ -1,27 +1,47 @@
+/***
+ * SPDX-License-Identifier: GPL-3.0
+ * == Developer History (NAME, ORG, DATE, DESCR) ==
+ * Isaac Dubuque, Verilink, 7/24/22, Initial Commit
+ * ================================================
+ * 
+ * File: IChipTable.sol
+ * Description: Chip Table Interface
+ */
+
 pragma solidity ^0.8.5;
 
+import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
-/**
- * Interface for ChipTable
- *
- *
+
+/***
+ * IChipTable
+ * Provides the interface for the ERS interim on-chain chip resolution
+ * The Chip Table allows the owner to register Trusted Service Managers (TSM)
+ * TSMs can add chips allowing for a decentralized chip resolution
+ * Chips can be look up their TSM for device information and redirect resolution
  */
-interface IChipTable
+interface IChipTable is IERC165
 {
   /**
    * Registered TSM
    */
-  event TSMRegistered(address tsmAddress, bytes32 tsmId, string tsmName, string tsmUri);
+  event TSMRegistered(address tsmAddress, string tsmUri);
   
   /**
    * TSM approved operator
    */
-  event TSMApproved(bytes32 tsmId, address operator);
+  event TSMApproved(address tsmAddress, address operator);
 
   /**
    * Chip Registered with ERS
    */
-  event ChipRegistered(bytes32 chipId, bytes32 tsmId);
+  event ChipRegistered(bytes32 chipId, address tsmAddress);
+
+  /**
+   * returns the message to be signed by the chip
+   */
+  function signatureMessage () 
+    external pure returns (string memory);
 
   /**
    * Registers a TSM 
@@ -29,18 +49,27 @@ interface IChipTable
    */
   function registerTSM(
     address tsmAddress, 
-    string calldata tsmName,
-    string calldata tsmUri) external;
+    string calldata uri) external;
   
   /**
    * Registers Chip Ids without signatures
    * Permissions: Owner
    */
   function registerChipIds(
-    bytes32 tsmId,
+    address tsmAddress,
     bytes32[] calldata chipIds
   ) external;
 
+  /**
+   * Registers Chip Ids with Signatures
+   * Permissions: Owner
+   */
+  function safeRegisterChipIds(
+    address tsmAddress,
+    bytes32[] calldata chipIds,
+    bytes[] calldata signatures
+  ) external;
+  
   /**
    * Returns the number of registered TSMs
    */
@@ -50,37 +79,25 @@ interface IChipTable
   /**
    * Returns the TSM Id by Index
    */
-  function tsmIdByIndex(uint256 index) 
-    external view returns (bytes32);
-
-  /**
-   * Returns the TSM name
-   */
-  function tsmName(bytes32 tsmId) 
-    external view returns (string memory);
+  function tsmByIndex(uint256 index) 
+    external view returns (address);
 
   /**
    * Returns the TSM uri
    */
-  function tsmUri(bytes32 tsmId) 
+  function tsmUri(address tsmAddress) 
     external view returns (string memory);
-
-  /**
-   * Returns the TSM address
-   */
-  function tsmAddress(bytes32 tsmId) 
-    external view returns (address);
 
   /**
    * Returns the TSM operator
    */
-  function tsmOperator(bytes32 tsmId) 
+  function tsmOperator(address tsmAddress) 
     external view returns (address);
 
   /**
    * Approves an operator for a TSM
    */
-  function approve(bytes32 tsmId, address operator) external;
+  function approve(address operator) external;
 
   /**
    * Adds a ChipId
@@ -88,7 +105,7 @@ interface IChipTable
    * Permissions: TSM
    */
   function addChipId(
-    bytes32 tsmId, 
+    address tsmAddress, 
     bytes32 chipId, 
     bytes calldata signature) external;
 
@@ -98,7 +115,7 @@ interface IChipTable
    * Permissions: TSM
    */
   function addChipIds(
-    bytes32 tsmId,
+    address tsmAddress,
     bytes32[] calldata chipIds,
     bytes[] calldata signatures
   ) external;
@@ -106,8 +123,8 @@ interface IChipTable
   /**
    * gets a Chip's TSM Id
    */
-  function chipTSMId(bytes32 chipId) 
-    external view returns (bytes32);
+  function chipTSM(bytes32 chipId) 
+    external view returns (address);
 
   /**
    * Gets the Chip Redirect Uri
