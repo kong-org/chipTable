@@ -19,7 +19,7 @@ async function main()
   hre = require("hardhat");
 
   /* await hre.run("compile"); */ /* attempt recent compile */
-
+  
   if(!hre.ethers.utils.isAddress(options.owner))
   {
     throw `Error: Invalid Address: ${options.owner}`;
