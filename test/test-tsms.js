@@ -38,9 +38,9 @@ describe("ChipTable: TSM", function ()
   beforeEach(async function () {
 
     [owner, tsm1, tsm2, tsm3, ...signers] = await ethers.getSigners();
-
+    const version = "0.1";
     contract = await ethers.getContractFactory("ChipTable");
-    chipTable = await contract.deploy(owner.address);
+    chipTable = await contract.deploy(owner.address, version);
     await chipTable.deployed();
 
     expect(await chipTable.owner()).to.equal(owner.address);
@@ -88,6 +88,19 @@ describe("ChipTable: TSM", function ()
     it("Should fail to approve an operator for unregistered TSM", async function ()
     {
       await expect(chipTable.connect(tsm1).approve(tsm2.address))
+        .to.be.revertedWith("TSM: tsm does not exist");
+    });
+
+    it("Should change the TSM uri", async function () {
+      const newUri = "https://verilink.io";
+      await expectTSMRegistration(chipTable, owner, tsm1.address);
+      await chipTable.connect(tsm1).tsmSetUri(newUri);
+      expect(await chipTable.tsmUri(tsm1.address)).to.equal(newUri);
+    });
+
+    it("Should fail to change TSM uri for non-TSM", async function () {
+      const newUri = "https://verilink.io";
+      await expect(chipTable.connect(tsm1).tsmSetUri(newUri))
         .to.be.revertedWith("TSM: tsm does not exist");
     });
   });

@@ -12,35 +12,39 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
 const CHIPTABLE_ABI = [
+  "function registryVersion() external returns (string memory)",
   "function registerTSM(address tsmAddress, string calldata uri) external",
   "function registerChipIds(address tsmAddress, bytes32[] calldata chipIds) external",
   "function safeRegisterChipIds(address tsmAddress, bytes32[] calldata chipIds, bytes[] calldata signatures) external",
   "function totalTSMs() external view returns (uint256)",
   "function tsmByIndex(uint256 index) external view returns (address)",
   "function tsmUri(address tsmAddress) external view returns (string memory)",
+  "function tsmSetUri(string calldata uri) external",
   "function tsmOperator(address tsmAddress) external view returns (address)",
   "function approve(address operator) external",
   "function addChipId(address tsmAddress, bytes32 chipId, bytes calldata signature) external",
   "function addChipIds(address tsmAddress, bytes32[] calldata chipIds, bytes[] calldata signatures) external",
   "function chipTSM(bytes32 chipId) external view returns (address)",
   "function chipUri(bytes32 chipId) external view returns (string memory)",
-  "function signatureMessage () external pure returns (string memory)"
+  "function chipExists(bytes32 chipId) external view returns (bool)"
 ];
 
 const CHIPTABLE_FUNCS = [
+  "registryVersion",
   "registerTSM",
   "registerChipIds",
   "safeRegisterChipIds",
   "totalTSMs",
   "tsmByIndex",
   "tsmUri",
+  "tsmSetUri",
   "tsmOperator",
   "approve",
   "addChipId",
   "addChipIds",
   "chipTSM",
   "chipUri",
-  "signatureMessage"
+  "chipExists"
 ];
 
 async function expectInterface(contract, abi, funcs)
@@ -69,13 +73,15 @@ describe("ChipTable: Deployment", function() {
   let deployer;
   let futureOwner;
   let signers;
+  let version;
 
   beforeEach(async function () {
 
     [deployer, futureOwner, ...signers] = await ethers.getSigners();
+    version = "0.1";
 
     contract = await ethers.getContractFactory("ChipTable");
-    chipTable = await contract.deploy(deployer.address);
+    chipTable = await contract.deploy(deployer.address, version);
     await chipTable.deployed();
 
     expect(await chipTable.owner()).to.equal(deployer.address);
@@ -95,4 +101,9 @@ describe("ChipTable: Deployment", function() {
     });
   });
 
+  describe("Registery Version", function () {
+    it("Should return the registry version", async () => {
+      expect(await chipTable.registryVersion()).to.equal(version);
+    })
+  });
 }); 

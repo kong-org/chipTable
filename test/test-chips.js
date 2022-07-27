@@ -26,12 +26,12 @@ function formatSignature(r, s, v)
     ]);
 }
 
-async function getDeviceSignature(device, message)
+async function getDeviceSignature(device, tsmAddress)
 {
   /* encode ABI */
   let hash = ethers.utils.keccak256(ethers.utils.solidityPack(
-      ["string"], 
-      [message]));
+      ["address"], 
+      [tsmAddress]));
   hash = ethers.utils.arrayify(hash);
 
   /* personal_sign the message */
@@ -76,12 +76,12 @@ const expectOwnerRegisterChips = async (chipTable, owner, tsm, devices, revertSt
 
 const expectOwnerSafeRegisterChips = async (chipTable, owner, tsm, devices, revertStr="", fakeSignature=false) => {
   const chipIds = devices.map(device => device.chipId);
-  const signatureMessage = await chipTable.signatureMessage();
-  var signatures = devices.map(async device => (await getDeviceSignature(device, signatureMessage)));
+
+  var signatures = devices.map(async device => (await getDeviceSignature(device, tsm.address)));
 
   if(fakeSignature)
   {
-    signatures[devices.length-1] = await getDeviceSignature(tsm, signatureMessage);
+    signatures[devices.length-1] = await getDeviceSignature(tsm, tsm.address);
   }
 
   if(revertStr)
@@ -102,14 +102,12 @@ const expectOwnerSafeRegisterChips = async (chipTable, owner, tsm, devices, reve
 
 const expectTSMAddChip = async (chipTable, signer, tsm, device, revertStr="", fakeSignature=false) =>
 {
-  
-  const signatureMessage = await chipTable.signatureMessage();
   const chipId = device.chipId;
-  var signature = await getDeviceSignature(device, signatureMessage);
+  var signature = await getDeviceSignature(device, tsm.address);
   
   if(fakeSignature)
   {
-    signature = await getDeviceSignature(tsm, signatureMessage);
+    signature = await getDeviceSignature(tsm, tsm.address);
   }
 
   if(revertStr)
@@ -128,12 +126,11 @@ const expectTSMAddChip = async (chipTable, signer, tsm, device, revertStr="", fa
 const expectTSMAddChips = async (chipTable, signer, tsm, devices, revertStr="", fakeSignature=false) =>
 {
   const chipIds = devices.map(device => device.chipId);
-  const signatureMessage = await chipTable.signatureMessage();
-  var signatures = devices.map(async device => (await getDeviceSignature(device, signatureMessage)));
+  var signatures = devices.map(async device => (await getDeviceSignature(device, tsm.address)));
 
   if(fakeSignature)
   {
-    signatures[devices.length-1] = await getDeviceSignature(tsm, signatureMessage);
+    signatures[devices.length-1] = await getDeviceSignature(tsm, tsm.address);
   }
 
   if(revertStr)
@@ -169,9 +166,10 @@ describe("ChipTable: Chip", function ()
       ...signers ] = await ethers.getSigners();
     
     devices = createDevices(20);
+    const version = "0.1";
 
     contract = await ethers.getContractFactory("ChipTable");
-    chipTable = await contract.deploy(owner.address);
+    chipTable = await contract.deploy(owner.address, version);
     await chipTable.deployed();
 
     expect(await chipTable.owner()).to.equal(owner.address);
@@ -338,7 +336,20 @@ describe("ChipTable: Chip", function ()
         await expectTSMAddChips(chipTable, tsm2, tsm1, 
           [devices[0], devices[1], devices[2]], revertStr="TSM: caller is not TSM or approved");
       });
+
+      it("Should indicate valid chip exists", async function () {
+        tsm1.uri = await registerTSM(chipTable, owner, tsm1);
+        await expectTSMAddChips(chipTable, tsm1, tsm1, 
+          [devices[0], devices[1], devices[2]]);
+        expect(await chipTable.chipExists(devices[0].chipId)).to.equal(true);
+      });
+
+      it("Should indicate valid chip does not exist", async function () {
+        tsm1.uri = await registerTSM(chipTable, owner, tsm1);
+        await expectTSMAddChips(chipTable, tsm1, tsm1, 
+          [devices[0], devices[1], devices[2]]);
+        expect(await chipTable.chipExists(devices[3].chipId)).to.equal(false);
+      });
     });
-    
   });
 })
