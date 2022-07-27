@@ -41,20 +41,13 @@ contract ChipTable is IChipTable, Context, Ownable
   mapping(uint256 => address) private _tsmIndex; /* mapping from TSM index => tsmAddress */
   uint256 private _tsmCount;
 
-  /* constants */
-  string constant private SIGNATURE_MESSAGE = "kong.land";
-  bytes32 immutable private SIGNATURE_HASH;
+  string private VERSION;
 
-  constructor(address _contractOwner)
+  constructor(address _contractOwner, string memory _registryVersion)
   {
     transferOwnership(_contractOwner);
     _tsmCount = 0;
-    SIGNATURE_HASH = keccak256(
-      abi.encodePacked(
-        "\x19Ethereum Signed Message:\n32",
-        keccak256(abi.encodePacked(SIGNATURE_MESSAGE))
-      )
-    );
+    VERSION = _registryVersion;
   }
 
   function supportsInterface(bytes4 interfaceId)
@@ -63,9 +56,9 @@ contract ChipTable is IChipTable, Context, Ownable
     return interfaceId == type(IChipTable).interfaceId;
   }
 
-  function signatureMessage () external pure override returns (string memory)
+  function registryVersion() external view override returns (string memory)
   {
-    return SIGNATURE_MESSAGE;
+    return VERSION;
   }
 
   /*=== OWNER ===*/
@@ -168,6 +161,13 @@ contract ChipTable is IChipTable, Context, Ownable
   {
     return _tsms[tsmAddress]._uri;
   }
+
+  function tsmSetUri(string calldata uri) 
+    public override onlyTSM(_msgSender())
+  {
+    _tsms[_msgSender()]._uri = uri;
+    emit TSMUpdate(_msgSender(), uri);
+  }
   
   function tsmOperator(address tsmAddress) 
     public override view onlyTSM(tsmAddress) returns (address)
@@ -210,9 +210,10 @@ contract ChipTable is IChipTable, Context, Ownable
     return _chipIds[chipId]._tsmAddress != address(0);
   }
 
-  function _isValidChipSignature(bytes32 chipId, bytes calldata signature) internal view returns (bool)
+  function _isValidChipSignature(address tsmAddress, bytes32 chipId, bytes calldata signature) internal pure returns (bool)
   {
     address _signer;
+    bytes32 msgHash;
     bytes32 _r;
     bytes32 _s;
     uint8 _v;
@@ -236,7 +237,14 @@ contract ChipTable is IChipTable, Context, Ownable
       revert("Chip: invalid sig `v`");
     }
 
-    _signer = ecrecover(SIGNATURE_HASH, _v, _r, _s);
+    msgHash = keccak256(
+      abi.encodePacked(
+        "\x19Ethereum Signed Message:\n32",
+        keccak256(abi.encodePacked(tsmAddress))
+      )
+    );
+
+    _signer = ecrecover(msgHash, _v, _r, _s);
     
     require(_signer != address(0x0), "Chip: invalid signer");
 
@@ -245,7 +253,7 @@ contract ChipTable is IChipTable, Context, Ownable
 
   function _addChipSafe(address tsmAddress, bytes32 chipId, bytes calldata signature) internal
   {
-    require(_isValidChipSignature(chipId, signature), "Chip: chip signature invalid");
+    require(_isValidChipSignature(tsmAddress, chipId, signature), "Chip: chip signature invalid");
     _addChip(tsmAddress, chipId);
   }
 
@@ -266,5 +274,11 @@ contract ChipTable is IChipTable, Context, Ownable
   {
     return tsmUri(chipTSM(chipId));
   }
+
+  function chipExists(bytes32 chipId) public override view returns (bool)
+  {
+    return _chipExists(chipId);
+  }
+
   /*=== END CHIP ===*/
 }

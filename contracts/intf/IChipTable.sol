@@ -38,10 +38,14 @@ interface IChipTable is IERC165
   event ChipRegistered(bytes32 chipId, address tsmAddress);
 
   /**
-   * returns the message to be signed by the chip
+   * TSM updated
    */
-  function signatureMessage () 
-    external pure returns (string memory);
+  event TSMUpdate(address tsmAddress, string tsmUri);
+
+  /**
+    Registry Version
+   */
+  function registryVersion() external returns (string memory);
 
   /**
    * Registers a TSM 
@@ -69,7 +73,7 @@ interface IChipTable is IERC165
     bytes32[] calldata chipIds,
     bytes[] calldata signatures
   ) external;
-  
+
   /**
    * Returns the number of registered TSMs
    */
@@ -87,6 +91,11 @@ interface IChipTable is IERC165
    */
   function tsmUri(address tsmAddress) 
     external view returns (string memory);
+
+  /**
+   * Sets the TSM uri
+   */
+  function tsmSetUri(string calldata uri) external;
 
   /**
    * Returns the TSM operator
@@ -131,4 +140,10 @@ interface IChipTable is IERC165
    */
   function chipUri(bytes32 chipId) 
     external view returns (string memory);
+  
+  /**
+   * Get whether chip exists
+   */
+  function chipExists(bytes32 chipId)
+    external view returns (bool);
 }
