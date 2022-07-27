@@ -26,13 +26,21 @@ event ChipRegistered(bytes32 chipId, address tsmAddress)
 
 Chip Registered with ERS
 
-### signatureMessage
+### TSMUpdate
 
 ```solidity
-function signatureMessage() external pure returns (string)
+event TSMUpdate(address tsmAddress, string tsmUri)
 ```
 
-returns the message to be signed by the chip
+TSM updated
+
+### registryVersion
+
+```solidity
+function registryVersion() external returns (string)
+```
+
+Registry Version
 
 ### registerTSM
 
@@ -84,6 +92,14 @@ function tsmUri(address tsmAddress) external view returns (string)
 ```
 
 Returns the TSM uri
+
+### tsmSetUri
+
+```solidity
+function tsmSetUri(string uri) external
+```
+
+Sets the TSM uri
 
 ### tsmOperator
 
@@ -137,6 +153,14 @@ function chipUri(bytes32 chipId) external view returns (string)
 
 Gets the Chip Redirect Uri
 
+### chipExists
+
+```solidity
+function chipExists(bytes32 chipId) external view returns (bool)
+```
+
+Get whether chip exists
+
 ## ChipTable
 
 ### TSM
@@ -181,22 +205,16 @@ mapping(uint256 => address) _tsmIndex
 uint256 _tsmCount
 ```
 
-### SIGNATURE_MESSAGE
+### VERSION
 
 ```solidity
-string SIGNATURE_MESSAGE
-```
-
-### SIGNATURE_HASH
-
-```solidity
-bytes32 SIGNATURE_HASH
+string VERSION
 ```
 
 ### constructor
 
 ```solidity
-constructor(address _contractOwner) public
+constructor(address _contractOwner, string _registryVersion) public
 ```
 
 ### supportsInterface
@@ -212,13 +230,13 @@ to learn more about how these ids are created.
 
 This function call must use less than 30 000 gas._
 
-### signatureMessage
+### registryVersion
 
 ```solidity
-function signatureMessage() external pure returns (string)
+function registryVersion() external view returns (string)
 ```
 
-returns the message to be signed by the chip
+Registry Version
 
 ### registerTSM
 
@@ -307,6 +325,14 @@ function tsmUri(address tsmAddress) public view returns (string)
 
 Returns the TSM uri
 
+### tsmSetUri
+
+```solidity
+function tsmSetUri(string uri) public
+```
+
+Sets the TSM uri
+
 ### tsmOperator
 
 ```solidity
@@ -352,7 +378,7 @@ function _chipExists(bytes32 chipId) internal view returns (bool)
 ### _isValidChipSignature
 
 ```solidity
-function _isValidChipSignature(bytes32 chipId, bytes signature) internal view returns (bool)
+function _isValidChipSignature(address tsmAddress, bytes32 chipId, bytes signature) internal pure returns (bool)
 ```
 
 ### _addChipSafe
@@ -382,4 +408,12 @@ function chipUri(bytes32 chipId) external view returns (string)
 ```
 
 Gets the Chip Redirect Uri
+
+### chipExists
+
+```solidity
+function chipExists(bytes32 chipId) public view returns (bool)
+```
+
+Get whether chip exists
 
