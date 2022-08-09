@@ -26,7 +26,27 @@ Data:
 Data: 
  - tsmId: maps the chip to a tsm
 
-## .env
-PRIVATE_KEY="<your_private_key>": Used for deploying
-ALCHEMY_API_KEY="<your_alchemy_api_key>": Used for forking mainnet
-COINMARKETCAP_KEY="<your_coinmarketcap_key>": Used for tracking gas prices
+# Scripts
+## Deploy
+Deploy `chipTable.sol`. Requires `owner`, `version` and `network` parameters.
+
+### Usage
+`node scripts/deploy-script.js -o OWNER_ADDRESS -v VERSION -n NETWORK`
+
+## Register TSM
+Add a new TSM. Can only be called by owner. Requires `contract-address`, `tsm`, `uri` and `network` parameters.
+
+### Usage
+`node scripts/register-tsm.js -c CHIP_TABLE_ADDRESS -t TSM_ADDRESS -u TSM_URI -n NETWORK`
+
+## Register Chips
+Add chips to `chipTable`. Expects a `.txt` file with one chip public key, `04` prepended, per line. See `publicKeySamples.txt`. Requires `contract-address`, `tsm`, `public-key-path` and `network` parameters.
+
+### Usage
+`node scripts/register-chips.js -c CHIP_TABLE_ADDRESS -t TSM_ADDRESS -p PUBLIC_KEY_LIST_FILE -n NETWORK` 
+
+# .env
+- PRIVATE_KEY="<your_private_key>": Used for deploying
+- ALCHEMY_API_KEY="<your_alchemy_api_key>": Used for forking mainnet
+- COINMARKETCAP_KEY="<your_coinmarketcap_key>": Used for tracking gas prices
+- ETHERSCAN_API_KEY="<your_etherscan_key>": Used for verifying contracts on Etherscan
