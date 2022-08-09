@@ -6,12 +6,16 @@ const rl = readline.createInterface({
   output: process.stdout
 });
 
+console.log(`script invoked.`)
+
 program
   .requiredOption("-o --owner <owner>", "Owner Address of the ChipTable")
   .requiredOption("-v --version <version>", "Version of the ChipTable")
-  .requiredOption("-n --network <network>", "{ maticMain, maticTest, hardhat}")
+  .requiredOption("-n --network <network>", "{ maticMain, maticTest, optimismKovan, optimismGoerli, optimism, hardhat }")
 program.parse(process.argv);
 const options = program.opts();
+
+console.log(options)
 
 async function main()
 {
@@ -47,6 +51,6 @@ async function main()
 } 
 
 main().then(() => process.exit(0)).catch(error => {
-  console.error(error);
+  console.error({error});
   process.exit(1);
 });
